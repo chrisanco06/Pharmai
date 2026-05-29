@@ -23,18 +23,29 @@ export default async (req, context) => {
     body: JSON.stringify({
       model: 'anthropic/claude-sonnet-4-5',
       max_tokens: 1000,
-      system: body.system,
-      messages: body.messages,
+      messages: [
+        {
+          role: 'system',
+          content: body.system
+        },
+        ...body.messages,
+        {
+          role: 'user',
+          content: `IMPORTANT: Tu dois répondre UNIQUEMENT en JSON valide, sans aucun texte avant ou après. Format exact requis:
+{"message":"...","chips":["option1","option2","option3"],"products":null,"step":1,"warning":null}
+Ne pose QU'UNE seule question courte. Propose 3-4 chips cliquables courtes (max 4 mots). Pas de listes dans message.
+
+Message de l'utilisateur: ${body.messages[body.messages.length - 1].content}`
+        }
+      ],
     }),
   });
 
   const data = await response.json();
+  const text = data.choices?.[0]?.message?.content || '';
 
-  // Convertir format OpenRouter → format Anthropic attendu par le frontend
   const converted = {
-    content: [
-      { type: 'text', text: data.choices?.[0]?.message?.content || '' }
-    ]
+    content: [{ type: 'text', text }]
   };
 
   return new Response(JSON.stringify(converted), {
