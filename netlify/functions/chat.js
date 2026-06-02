@@ -12,44 +12,26 @@ export default async (req, context) => {
 
   const body = await req.json();
 
-  // OpenRouter uses messages array with system role — no separate system field
-  const messages = [
-    { role: 'system', content: body.system },
-    ...body.messages
-  ];
-
-  // Force JSON on last user message
-  const last = messages[messages.length - 1];
-  if (last.role === 'user') {
-    last.content = last.content + '\n\n[Réponds UNIQUEMENT avec du JSON valide, format: {"message":"...","chips":["..."],"products":null,"step":1,"warning":null}]';
-  }
-
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${Netlify.env.get('OPENROUTER_API_KEY')}`,
-      'HTTP-Referer': 'https://pharmai.netlify.app',
-      'X-Title': 'PharmIA',
+      'x-api-key': Netlify.env.get('ANTHROPIC_API_KEY'),
+      'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'anthropic/claude-3-5-sonnet',
+      model: 'claude-3-5-sonnet-20241022',
       max_tokens: 1000,
-      messages,
+      system: body.system,
+      messages: body.messages,
     }),
   });
 
   const data = await response.json();
-  
-  // Log for debugging
-  console.log('OpenRouter response:', JSON.stringify(data).substring(0, 500));
-  
-  const text = data.choices?.[0]?.message?.content || '';
+  console.log('Anthropic status:', response.status, JSON.stringify(data).substring(0, 300));
 
-  return new Response(JSON.stringify({
-    content: [{ type: 'text', text }]
-  }), {
-    status: 200,
+  return new Response(JSON.stringify(data), {
+    status: response.status,
     headers: {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
