@@ -39,7 +39,7 @@ Règles :
       'X-Title': 'PharmIA',
     },
     body: JSON.stringify({
-      model: 'anthropic/claude-sonnet-4-5',
+      model: 'anthropic/claude-3-5-sonnet',
       max_tokens: 1000,
       messages: [
         { role: 'system', content: body.system },
