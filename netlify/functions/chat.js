@@ -1,42 +1,52 @@
-export default async (req, context) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      }
-    });
+const https = require('https');
+
+exports.handler = async function(event, context) {
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Content-Type': 'application/json'
+  };
+
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 200, headers, body: '' };
   }
 
-  const body = await req.json();
+  try {
+    const body = JSON.parse(event.body);
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': Netlify.env.get('ANTHROPIC_API_KEY'),
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
+    const payload = JSON.stringify({
       model: 'claude-3-5-sonnet-20241022',
       max_tokens: 1000,
       system: body.system,
       messages: body.messages,
-    }),
-  });
+    });
 
-  const data = await response.json();
-  console.log('Anthropic status:', response.status, JSON.stringify(data).substring(0, 300));
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: payload,
+    });
 
-  return new Response(JSON.stringify(data), {
-    status: response.status,
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-    }
-  });
+    const data = await response.json();
+    console.log('Response status:', response.status, 'Data:', JSON.stringify(data).substring(0, 200));
+
+    return {
+      statusCode: response.status,
+      headers,
+      body: JSON.stringify(data)
+    };
+
+  } catch(err) {
+    console.log('Error:', err.message);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: err.message })
+    };
+  }
 };
-
-export const config = { path: '/api/chat' };
