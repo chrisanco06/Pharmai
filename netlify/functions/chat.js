@@ -12,6 +12,24 @@ export default async (req, context) => {
 
   const body = await req.json();
 
+  // Inject a strong JSON-only reminder as last user message
+  const messages = [...body.messages];
+  const lastMsg = messages[messages.length - 1];
+  messages[messages.length - 1] = {
+    role: lastMsg.role,
+    content: `${lastMsg.content}
+
+INSTRUCTION CRITIQUE : Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ou après, sans markdown. Format OBLIGATOIRE :
+{"message":"Ta question courte ici","chips":["Option 1","Option 2","Option 3","Option 4"],"products":null,"step":1,"warning":null}
+
+Règles :
+- "message" = UNE seule question courte (max 15 mots)
+- "chips" = 3 à 5 options cliquables courtes (max 4 mots chacune)
+- "products" = null sauf à l'étape 5
+- "step" = numéro de l'étape actuelle (1 à 5)
+- PAS de texte libre, PAS de listes, UNIQUEMENT le JSON`
+  };
+
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -24,19 +42,8 @@ export default async (req, context) => {
       model: 'anthropic/claude-sonnet-4-5',
       max_tokens: 1000,
       messages: [
-        {
-          role: 'system',
-          content: body.system
-        },
-        ...body.messages,
-        {
-          role: 'user',
-          content: `IMPORTANT: Tu dois répondre UNIQUEMENT en JSON valide, sans aucun texte avant ou après. Format exact requis:
-{"message":"...","chips":["option1","option2","option3"],"products":null,"step":1,"warning":null}
-Ne pose QU'UNE seule question courte. Propose 3-4 chips cliquables courtes (max 4 mots). Pas de listes dans message.
-
-Message de l'utilisateur: ${body.messages[body.messages.length - 1].content}`
-        }
+        { role: 'system', content: body.system },
+        ...messages
       ],
     }),
   });
@@ -44,12 +51,24 @@ Message de l'utilisateur: ${body.messages[body.messages.length - 1].content}`
   const data = await response.json();
   const text = data.choices?.[0]?.message?.content || '';
 
+  // Try to extract valid JSON
+  let finalText = text;
+  try {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) {
+      JSON.parse(match[0]); // validate
+      finalText = match[0];
+    }
+  } catch(e) {
+    // fallback: return raw text, frontend handles it
+  }
+
   const converted = {
-    content: [{ type: 'text', text }]
+    content: [{ type: 'text', text: finalText }]
   };
 
   return new Response(JSON.stringify(converted), {
-    status: response.status,
+    status: 200,
     headers: {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
