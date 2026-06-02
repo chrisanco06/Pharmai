@@ -12,23 +12,17 @@ export default async (req, context) => {
 
   const body = await req.json();
 
-  // Inject a strong JSON-only reminder as last user message
-  const messages = [...body.messages];
-  const lastMsg = messages[messages.length - 1];
-  messages[messages.length - 1] = {
-    role: lastMsg.role,
-    content: `${lastMsg.content}
+  // OpenRouter uses messages array with system role — no separate system field
+  const messages = [
+    { role: 'system', content: body.system },
+    ...body.messages
+  ];
 
-INSTRUCTION CRITIQUE : Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ou après, sans markdown. Format OBLIGATOIRE :
-{"message":"Ta question courte ici","chips":["Option 1","Option 2","Option 3","Option 4"],"products":null,"step":1,"warning":null}
-
-Règles :
-- "message" = UNE seule question courte (max 15 mots)
-- "chips" = 3 à 5 options cliquables courtes (max 4 mots chacune)
-- "products" = null sauf à l'étape 5
-- "step" = numéro de l'étape actuelle (1 à 5)
-- PAS de texte libre, PAS de listes, UNIQUEMENT le JSON`
-  };
+  // Force JSON on last user message
+  const last = messages[messages.length - 1];
+  if (last.role === 'user') {
+    last.content = last.content + '\n\n[Réponds UNIQUEMENT avec du JSON valide, format: {"message":"...","chips":["..."],"products":null,"step":1,"warning":null}]';
+  }
 
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -41,33 +35,20 @@ Règles :
     body: JSON.stringify({
       model: 'anthropic/claude-3-5-sonnet',
       max_tokens: 1000,
-      messages: [
-        { role: 'system', content: body.system },
-        ...messages
-      ],
+      messages,
     }),
   });
 
   const data = await response.json();
+  
+  // Log for debugging
+  console.log('OpenRouter response:', JSON.stringify(data).substring(0, 500));
+  
   const text = data.choices?.[0]?.message?.content || '';
 
-  // Try to extract valid JSON
-  let finalText = text;
-  try {
-    const match = text.match(/\{[\s\S]*\}/);
-    if (match) {
-      JSON.parse(match[0]); // validate
-      finalText = match[0];
-    }
-  } catch(e) {
-    // fallback: return raw text, frontend handles it
-  }
-
-  const converted = {
-    content: [{ type: 'text', text: finalText }]
-  };
-
-  return new Response(JSON.stringify(converted), {
+  return new Response(JSON.stringify({
+    content: [{ type: 'text', text }]
+  }), {
     status: 200,
     headers: {
       'Content-Type': 'application/json',
