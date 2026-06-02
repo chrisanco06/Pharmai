@@ -667,17 +667,9 @@ function resetChat() {
   init();
 }
 
-async function init() {
-  showTyping();
-  try {
-    const result = await callAPI("Bonjour, j'ai besoin d'un conseil produit parapharmacie.");
-    removeTyping();
-    addMsg('ai', result.message, result.chips || [], result.products, result.warning);
-  } catch(e) {
-    removeTyping();
-    addMsg('ai', "Bonjour ! Pour quel type de produit puis-je vous aider aujourd'hui ?",
-      ["Soin visage / peau", "Compléments alimentaires", "Hygiène corps", "Produits bébé", "Bien-être"]);
-  }
+function init() {
+  addMsg('ai', "Bonjour ! Pour quel type de produit puis-je vous aider aujourd'hui ?",
+    ["🧴 Soin visage / peau", "💊 Compléments alimentaires", "🧼 Hygiène corps", "👶 Produits bébé", "🌿 Bien-être"]);
 }
 
 document.getElementById('sendBtn').onclick = () => sendMessage();
