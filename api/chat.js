@@ -7,11 +7,14 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   try {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    console.log('API Key present:', !!apiKey, 'starts with:', apiKey?.substring(0, 10));
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
@@ -23,9 +26,12 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
+    console.log('Anthropic status:', response.status, 'response:', JSON.stringify(data).substring(0, 300));
+
     return res.status(response.status).json(data);
 
   } catch(err) {
+    console.log('Error:', err.message);
     return res.status(500).json({ error: err.message });
   }
 }
